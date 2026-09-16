@@ -7,8 +7,8 @@ const int SSL = 1;
 #include <stdlib.h>
 #include <string.h>
 
-char request_template[] = "GET / HTTP/1.1\r\nHost: localhost:3000\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\n\r\n";
-char request_template_post[] = "POST / HTTP/1.1\r\nHost: localhost:3000\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 10\r\n\r\n{\"key\":13}";
+char request_template[] = "GET %s HTTP/1.1\r\nHost: localhost:3000\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\n\r\n";
+char request_template_post[] = "POST %s HTTP/1.1\r\nHost: localhost:3000\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 10\r\n\r\n{\"key\":13}";
 
 char *request;
 int request_size;
@@ -49,7 +49,7 @@ struct us_socket_t *on_http_socket_writable(struct us_socket_t *s) {
 }
 
 struct us_socket_t *on_http_socket_close(struct us_socket_t *s, int code, void *reason) {
-	return s;
+    return s;
 }
 
 struct us_socket_t *on_http_socket_end(struct us_socket_t *s) {
@@ -117,26 +117,32 @@ struct us_socket_t *on_http_socket_connect_error(struct us_socket_t *s, int code
 int main(int argc, char **argv) {
 
     /* Parse host and port */
-    if (argc != 5 && argc != 4 && argc != 6) {
-        printf("Usage: connections host port [pipeline factor] [with body]\n");
+    if (argc < 4 || argc > 7) {
+        printf("Usage: connections host port [path] [pipeline factor] [with body]\n");
         return 0;
     }
 
-    if (argc >= 5) {
-        pipeline =  atoi(argv[4]);
+    const char *path = (argc >= 5) ? argv[4] : "/";
+
+    if (argc >= 6) {
+        pipeline = atoi(argv[5]);
         printf("Using pipeline factor of %d\n", pipeline);
     }
 
-    const char *selected_request = request_template;
-    int selected_request_size = sizeof(request_template) - 1;
+    const char *tmpl = request_template;
+    char formatted_request[1024];
 
-    if (argc >= 6) {
-        is_post =  atoi(argv[5]);
-        printf("Using post with body\n");
-
-        selected_request = request_template_post;
-        selected_request_size = sizeof(request_template_post) - 1;
+    if (argc >= 7) {
+        is_post = atoi(argv[6]);
+        if (is_post) {
+            printf("Using post with body\n");
+            tmpl = request_template_post;
+        }
     }
+
+    int selected_request_size = sprintf(formatted_request, tmpl, path);
+    const char *selected_request = formatted_request;
+
     /* Pipeline to 16 */
     request_size = pipeline * selected_request_size;
     printf("request size %d\n", request_size);
@@ -161,9 +167,9 @@ int main(int argc, char **argv) {
     struct us_socket_context_t *http_context = us_create_socket_context(SSL, loop, 0, options);
 
     if (!http_context) {
-		printf("Could not load SSL cert/key\n");
-		exit(0);
-	}
+        printf("Could not load SSL cert/key\n");
+        exit(0);
+    }
 
     /* Set up event handlers */
     us_socket_context_on_open(SSL, http_context, on_http_socket_open);
